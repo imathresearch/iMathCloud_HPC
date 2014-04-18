@@ -1,0 +1,250 @@
+#!/bin/bash
+
+echo ""
+echo ""
+echo "#########################################################################################"
+echo "################### CONFIGURATION AND INSTALLATION OF COLOSSUS AND HPC2 #################"
+echo "#########################################################################################"
+
+id_user=$(id -u)
+
+if [ $id_user == "0" ];
+then
+    echo "This script should be executed as a non-root user that has access to sudo"
+    exit -1
+fi
+
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+###############################   INPUT PARAMETERS #############################################
+echo ""
+echo "--------------------"
+echo ""
+while true; do
+    read -p "Insert the absolute path of the root file system of your installation of iMathCloud: " root
+    #Checkear si esta vacia
+    case $root in
+        [/]* ) echo "iMathCloudRoot="$root; break;;
+        * ) echo "Please enter an absolute correct path.";;
+    esac
+done
+
+if [ -d $root ];
+then
+    if [ ! "$id_user" == $(stat -c "%u" $root) ];
+    then
+        echo "The owner of $root directory should match the user executing the script"
+        exit -1
+    fi
+else
+    echo "The directory $root does not exist"
+    exit -1
+fi
+
+echo ""
+echo "--------------------"
+echo ""
+while true; do
+    read -p "Insert the name of the virtual environment to be created in this installation: " vn
+     if [ -z "$vn" ];
+     then
+	echo "Please enter a name."
+         
+     else
+       echo "The name of your virtual env will be $vn"
+       break
+     fi
+done
+
+
+#################################################################################################
+
+################################   GLOBAL PACKAGES    ###########################################
+echo ""
+echo "------------------------------------------------------------------------------------------"
+echo "Installing general required packages"
+echo "------------------------------------------------------------------------------------------"
+
+packages="portmap nfs-kernel-server libcurl4-openssl-dev openssh-server subversion git-core postgresql libpq-dev r-base python-dev"
+
+for p in $(echo $packages);
+do
+    PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $p|grep "install ok installed")
+    echo ""
+    echo "________________________________"
+    echo "Checking for $p"
+    if [ "" == "$PKG_OK" ]; then
+        echo "$p not found. Setting up $p"
+        sudo apt-get --force-yes --yes install $p
+    fi
+done
+#################################################################################################
+
+###############################   SSH CONFIGURATION   ###########################################
+echo ""
+echo "------------------------------------------------------------------------------------------"
+echo "SSH Configuration "
+echo "------------------------------------------------------------------------------------------"
+
+
+ssh_directory=$HOME/.ssh
+
+echo $HOME/.ssh
+
+if [ -d $ssh_directory ];
+then
+   echo "Directory $ssh_directory exists"
+   cd ~/.ssh
+
+   FILE=id_rsa.pub
+
+   if [ -f $FILE ];
+   then
+     echo "File $FILE exists"
+     #Check if id_rsa.pub is inside of authorized_keys
+     #content=$(grep -f id_rsa.pub authorized_keys)
+     if [ ! -f authorized_keys ] || [ "$(grep -f id_rsa.pub authorized_keys)" == "" ];
+     then
+           cat id_rsa.pub >> authorized_keys
+           chmod 600 authorized_keys
+     fi
+
+   else
+     echo "File $FILE does not exists"
+     echo "Please create a public and private key before executing the installation"
+     exit
+     #Generate id_rsa.pub
+   fi
+
+
+else
+   echo "Directory $ssh_directory does not exists"
+   echo "Generating public and private keys"
+   ssh-keygen -t rsa
+   cd ~/.ssh
+   cat id_rsa.pub >> authorized_keys
+   chmod 600 authorized_keys
+fi
+#################################################################################################
+
+###############################   VIRTUAL ENVIRONMENT  ##########################################
+
+echo ""
+echo "------------------------------------------------------------------------------------------"
+echo "Installing and configuring the virtual environment"
+echo "------------------------------------------------------------------------------------------"
+
+if [ "$(mount | grep "^127.0.0.1:$root on /mount_iMathCloud")" == "" ];
+then
+    sudo mkdir -p /mount_iMathCloud
+    sudo mount 127.0.0.1:$root /mount_iMathCloud
+
+    if [ ! $? == 0 ];
+    then
+       echo "Could not mount 127.0.0.1:/$root. Tips:"
+       echo "1. Insert into /etc/exports this line: $root 127.0.0.1(rw,sync,subtree_check)"
+       echo "2. Insert into /etc/hosts.allow the following lines:"
+       echo "portmap:127.0.0.1"
+       echo "lockd:127.0.0.1"
+       echo "mountd:127.0.0.1"
+       echo "rquotad:127.0.0.1"
+       echo "statd:127.0.0.1"
+       echo "3. Run sudo exportfs -ra"
+       exit -1
+    fi
+fi
+
+cd /mount_iMathCloud
+mkdir -p exec_dir
+mkdir -p trash
+mkdir -p temp
+mkdir -p environments
+mkdir -p data
+
+if [ ! $(which pip) ];
+then
+    echo "Cannot find pip. Installing (sudo)..."
+    cd /tmp
+    wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py
+    sudo python get-pip.py 
+fi
+
+echo ""
+echo "Installing virtualenv tool..."
+sudo pip install virtualenv
+
+echo ""
+echo "Creating virtualenv $vn..."
+cd /mount_iMathCloud/environments
+virtualenv $vn
+cd $vn
+mkdir etc
+cp $DIR/exec_startClient.py etc/
+echo localhost  > etc/host_file.txt
+source bin/activate
+
+
+echo ""
+echo "------------------------------------------------------------------------------------------"
+echo "Downloading Colossus from SVN repository alwaysdata.com "
+echo "------------------------------------------------------------------------------------------"
+while true; do
+    read -p "Insert your username of the SVN repository alwaysdata.com: " user
+    if [ -z "$user" ];
+     then
+        echo "Please enter a username."
+
+     else
+       echo "Your username is $user"
+       break
+    fi
+
+done
+
+svn co svn+ssh://$user@ssh.alwaysdata.com/home/imathresearch/svn/com.iMathCloud_Plugin/branches/alfa_0.3/Colossus $DIR/install_Colossus/Colossus
+
+echo ""
+echo "Installing Colossus in the virtual env $vn "
+pip install $DIR/install_Colossus
+
+
+echo ""
+echo "------------------------------------------------------------------------------------------"
+echo "Downloading HPC2 from SVN repository alwaysdata.com "
+echo "------------------------------------------------------------------------------------------"
+svn co svn+ssh://$user@ssh.alwaysdata.com/home/imathresearch/svn/com.iMathCloud_Plugin/branches/alfa_0.3/HPC2 $DIR/install_HPC2/HPC2
+
+echo ""
+echo "Installing HPC2 in the virtualenv $vn ..."
+pip install $DIR/install_HPC2
+################################################################################################
+
+############################### CONSTANTS TO SET MANUALLY BY THE USER ##########################
+echo ""
+echo "-------------------------------------------------------------------------"
+echo "-------------------------------------------------------------------------"
+
+echo "Remember to manually set the following variables in the source code:"
+
+echo "  - Colossus:"
+
+echo "      * SSHCONFIG = /home/{user}/.ssh"
+echo "      * VIRTUALENV = environments/$vn"
+echo "      * IPSERVER = 127.0.0.1"
+
+echo "-------------------------------------------------------------------------"
+echo "  - HPC2:"
+
+echo "      * ROOT_FILE_SYSTEM = $root"
+
+echo "-------------------------------------------------------------------------"
+
+echo "  - iMathCloud:"
+
+echo "      * ROOT_FILE_SYSTEM = $root"
+echo "-------------------------------------------------------------------------"
+
+echo "-------------------------------------------------------------------------"
+echo "-------------------------------------------------------------------------"
+
