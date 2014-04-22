@@ -24,7 +24,13 @@ class CorrelationParallel(ParallelListPairExtended):
         return [[i0, i1, r]]
     
     def merge(self,out1, out2, id=None):
-        return out1 + out2 
+        return out1 + out2
+    
+    def getCommandParameters(self):
+        pass
+    
+    def prepareClientData(self):
+        pass
     
 class ParallelListPairExtended_Test(unittest.TestCase):
     def setUp(self):

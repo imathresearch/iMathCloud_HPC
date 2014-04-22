@@ -137,7 +137,7 @@ class ParallelGen(object):
             if (i == init):
                 acum = xAux
             else:
-                acum = self.merge(acum, xAux, id = numThread)
+                acum = self.merge(acum, xAux, id=numThread)
             
             actualElem = i-init + 1
             self.__writeTempFile(fd, float(actualElem) / float(totalElems) * float(100))
@@ -314,16 +314,18 @@ class ParallelGen(object):
         return 1
     
     
-    def __getDataHost(self, host):
+    def __getDataHost(self, host, ssh_config_file=None):
         """
         This function returns a dictionary for the given host
         The structure of the dictionary is the following
         {'hostname': IP, 'user': usernameofthemachine}
         """
         # ssh config file
-        config = paramiko.SSHConfig()
-        config.parse(open(CONS.SSHCONFIG))
-        return config.lookup(host);
+        if ssh_config_file is not None:
+            config = paramiko.SSHConfig()
+            #config.parse(open(CONS.SSHCONFIG))
+            config.parse(open(ssh_config_file))
+            return config.lookup(host)
         
     
     def __connectToHost(self, host):
@@ -335,7 +337,7 @@ class ParallelGen(object):
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.load_system_host_keys()
         
-        dataHost = self.__getDataHost(host);    
+        dataHost = self.__getDataHost(host, CONS.SSHCONFIG);
         
         client.connect(dataHost['hostname'], username=dataHost.get('user', None));
         
@@ -367,17 +369,17 @@ class ParallelGen(object):
             CLOUD EXECUTION
         """
         
-        #We start the Master Server
+        #print "We start the Master Server"
         master_server = self.__runMasterServer(hosts)
         
-        #We calculate and put the data for the client in the masterserver queues
+        #print "We calculate and put the data for the client in the masterserver queues"
         self.__setInfoClients(master_server)
         
-        #We start the clients
+        #print "We start the clients"
         self.__startClientsFromRemote(hosts)
         
                
-        #We obtain the result of the clients
+        #print "We obtain the result of the clients"
         qOut = master_server.getOutputQueue()
         NHosts = len(hosts)
         
@@ -537,8 +539,7 @@ class ParallelGen(object):
         #We need to change it to the IP of the server
         ip = CONS.IPSERVER; 
         port = CONS.PORT;
-        key = 'test';
-        
+        key = 'test';        
         
         self.prepareClientData()
        
@@ -654,8 +655,8 @@ class ParallelGen(object):
     def getHosts(self):
         return self.__getHosts()
     
-    def getDataHosts(self, host):
-        return self.__getDataHost(host)
+    def getDataHosts(self, host, ssh_config_file):
+        return self.__getDataHost(host, ssh_config_file)
     
     def connecToHost(self, host):
         return self.__connectToHost(host)
@@ -679,4 +680,4 @@ class ParallelGen(object):
         return self.__computePairs(init, end, parts)
         
     def getClientManager(self):
-        return self.__startClientManager(ip='158.109.125.44', port = 8088, authKey='test')
+        return self.__startClientManager(ip='127.0.0.1', port = 8088, authKey='test')

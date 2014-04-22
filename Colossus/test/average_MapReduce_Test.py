@@ -39,6 +39,12 @@ class AverageAge(ParallelMapReduce):
         newAvg = (contacts1*num1 + contacts2*num2) / newNum
         return [newAvg, newNum]
     
+    def getCommandParameters(self):
+        pass
+    
+    def prepareClientData(self):
+        pass
+    
     
 class AverageAge_Test(unittest.TestCase):
     def setUp(self):

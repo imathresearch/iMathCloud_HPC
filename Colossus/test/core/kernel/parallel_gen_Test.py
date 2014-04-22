@@ -61,7 +61,7 @@ class Parallel_gen_Test(unittest.TestCase):
     """
         The tests test_getDataHost, test_connecToHost and test_getCPUs depend on the file config located at .ssh/ where the information about the 
         available machines have to be available
-        At the moment of performing the test, the content of this file is my computer is
+        At the moment of performing the test, we simulate this file and its content:
            Host andrea-H61H2-I3
            User andrea
            Hostname 158.109.125.44
@@ -69,16 +69,26 @@ class Parallel_gen_Test(unittest.TestCase):
            Host pesto
            User ammartinez
            Hostname 158.109.125.35
+        
+        Change the path of the simulated ssh_config file to be correct in your machine
 
     """
     def test_getDataHost(self):
         pg = ButlerCorrelationParallel(self.data)
         
+        name_file = "/home/andrea/ssh_config_file.txt";
+        file = open(name_file, "w");
+
+        lines_of_text = ["Host andrea-H61H2-I3\n", "User andrea\n", "Hostname 158.109.125.44\n", "Host pesto\n", "User ammartinez\n", "Hostname 158.109.125.35\n"]
+        file.writelines(lines_of_text)
+        file.close()
+
+        
         host1 = 'andrea-H61H2-I3'
         host2 = 'pesto'
         
-        data_host1 = pg.getDataHosts(host1)
-        data_host2 = pg.getDataHosts(host2)
+        data_host1 = pg.getDataHosts(host1, name_file)
+        data_host2 = pg.getDataHosts(host2, name_file)
         
         self.assertEqual(len(data_host1), 2)
         self.assertEqual(len(data_host2), 2)
@@ -87,31 +97,39 @@ class Parallel_gen_Test(unittest.TestCase):
         self.assertEqual(data_host2['hostname'], '158.109.125.35')
         self.assertEqual(data_host1['user'], 'andrea')
         self.assertEqual(data_host2['user'], 'ammartinez')
-        
+    
+    """
+        Put the number of cpus of your machine in the variable num_cpus
+    """  
     def test_connecToHost(self):
         pg = ButlerCorrelationParallel(self.data)
         
-        host1 = 'andrea-H61H2-I3'
-        host2 = 'pesto'
+        host = '127.0.0.1'
+        num_cpus = 4;
         
-        client_host1 = pg.connecToHost(host1) 
-        client_host2 = pg.connecToHost(host2)
+        client_host = pg.connecToHost(host) 
+        #client_host2 = pg.connecToHost(host2)
         
         #We check that in fact we have connected to these hosts
-        stdin1, stdout1, stderr1 = client_host1.exec_command('uname -n')
-        stdin2, stdout2, stderr2 = client_host2.exec_command('uname -n')
+        stdin, stdout, stderr = client_host.exec_command('grep processor /proc/cpuinfo')
+        #stdin2, stdout2, stderr2 = client_host2.exec_command('uname -n')
         
-        self.assertEqual(host1, stdout1.read().rstrip('\n'))
-        self.assertEqual(host2, stdout2.read().rstrip('\n'))
-     
+        self.assertEqual(len(stdout.readlines()), num_cpus)
+        #self.assertEqual(host2, stdout2.read().rstrip('\n'))
+    
+    """
+        Put the number of cpus of your machine in the variable num_cpus
+    """
     def test_getCPUs(self):
         pg = ButlerCorrelationParallel(self.data)
         
         #My machine has 4 cores
-        host1 = 'andrea-H61H2-I3'
+        host1 = '127.0.0.1'
+        num_cpus = 4;
+        
         ncpus = pg.getCPUs(host1)
         
-        self.assertEqual(ncpus, 4)
+        self.assertEqual(ncpus, num_cpus)
     
     """
         The goal of this test is to check that the remote queus between a master server of colossus
@@ -125,18 +143,19 @@ class Parallel_gen_Test(unittest.TestCase):
         - __runMasterServer
         - __setQueueInfo (Colossus server side)
         - __startClientManager
+        We suppose that the server is running on localhost 127.0.0.1
     """
     def test_setQueueInfo(self):
         pg = ButlerCorrelationParallel(self.data)
       
-        hosts = ['andrea-H61H2-I3']
+        #andrea-H61H2-I3
+        hosts = ['yourmachine']
         
-        #The master server of Colossus is started, and a shared queue with 'andrea-H61H2-I3' is stablished
+        #The master server of Colossus is started, and a shared queue with 'yourmachine' is stablished
         master_server = pg.getMasterServer(hosts)
         
         hostInfo = []      
-        hostInfo.append(['andrea-H61H2-I3',4])
-        #My machine only have 4 cpus
+        hostInfo.append(['yourmachine',4])
         parts = pg.getPart(4)
         init = pg.getInitialIndex()
         end = pg.getFinalIndex() 
@@ -146,7 +165,7 @@ class Parallel_gen_Test(unittest.TestCase):
         
         #The client server is started and connected to the master server of Colossus
         client_manager = pg.getClientManager()          
-        inputQ = client_manager.getInputQueue('andrea-H61H2-I3')  # Get the input queue corresponding to this Host
+        inputQ = client_manager.getInputQueue('yourmachine')  # Get the input queue corresponding to this Host
         outputQ = client_manager.getOutputQueue()  # Get the output queue        
         parts_client = inputQ.get()                # Get the increment between batches
         init_client = inputQ.get()                 # Get the initial point

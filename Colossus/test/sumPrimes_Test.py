@@ -23,7 +23,7 @@ class Test(ParallelMatrix):
             return x
         return 0
     
-    def merge(self,out1,out2):
+    def merge(self,out1,out2, id=None):
         return out1 + out2
     
     def isprime(self,n):
@@ -42,6 +42,11 @@ class Test(ParallelMatrix):
             i += 1
         return True
     
+    def getCommandParameters(self):
+        pass
+    
+    def prepareClientData(self):
+        pass
 
 class SumPrimes_Test(unittest.TestCase):
     def setUp(self):

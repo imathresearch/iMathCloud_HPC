@@ -53,7 +53,7 @@ class CONS(object):
     
     @constant
     def VIRTUALENV():
-        return "environments/virt3"
+        return "environments/virt2"
     
     @constant
     def IPSERVER():

@@ -40,6 +40,12 @@ class SumPrimesParallel(Colossus.core.kernel.parallel.ParallelList):
                 return False
             i += 1
         return True
+    
+    def getCommandParameters(self):
+        pass
+    
+    def prepareClientData(self):
+        pass
 
 class SumPrimes_Test(unittest.TestCase):
     def setUp(self):
